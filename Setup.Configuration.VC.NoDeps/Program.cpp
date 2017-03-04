@@ -68,7 +68,7 @@ int printRequest() {
 
 	CComPtr<ISetupInstance> instance;
 
-	std::wcout << L"Listing VS '15' instances:" << std::endl;
+	std::wcout << L"Listing Visual Studio 2017 instances:" << std::endl;
 	std::wcout << L"-------------------------------------------" << std::endl;
 	while (SUCCEEDED(enumInstances->Next(1, &instance, nullptr)) && instance)
 	{
