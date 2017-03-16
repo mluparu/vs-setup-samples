@@ -1,8 +1,11 @@
-// Setup.Configuration.ZeroDeps.VC.cpp : Defines the entry point for the console application.
-//
+// <copyright file="Program.cpp" company="Microsoft Corporation">
+// Copyright (C) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license. See LICENSE.txt in the project root for license information.
+// </copyright>
 
 #include "stdafx.h"
 #include <iostream>
+#include <fstream>
 #include "Setup.Configuration.h"
 
 using namespace ATL;
@@ -10,9 +13,32 @@ using namespace ATL;
 void PrintInstance(CComPtr<ISetupInstance2>& instance2, CComPtr<ISetupHelper>& setupHelper);
 void PrintPackageReference(CComPtr<ISetupPackageReference>& package);
 void PrintWorkloads(CComSafeArray<IUnknown*>& packages);
+int printRequest();
+void getUserInput();
 
+int option = 0;
+bool vcToolsFound = false;
+CComBSTR vcInstance;
+
+
+void getUserInput() {
+	std::cout << "-------Visual Studio 2017 Setup Helper-------\n";
+	std::cout << "1 - List installed VS2017 instances\n2 - List all installed workloads and components\n3 - Find instances with installed VC++ tools\n\n";
+	std::cout << "Select an option:";
+	std::cin >> option;
+
+	if (option != 1 && option != 2 && option != 3) printRequest();
+}
 int main()
 {
+	printRequest();
+	return 0;
+}
+
+int printRequest() {
+
+	getUserInput();
+
 	CoInitializeEx(NULL, COINIT_MULTITHREADED);
 
 	CComPtr<ISetupConfiguration> setupConfig = nullptr;
@@ -42,7 +68,7 @@ int main()
 
 	CComPtr<ISetupInstance> instance;
 
-	std::wcout << L"Listing VS '15' instances:" << std::endl;
+	std::wcout << L"Listing Visual Studio 2017 instances:" << std::endl;
 	std::wcout << L"-------------------------------------------" << std::endl;
 	while (SUCCEEDED(enumInstances->Next(1, &instance, nullptr)) && instance)
 	{
@@ -58,18 +84,22 @@ int main()
 		instance = nullptr;
 		std::wcout << L"*" << std::endl;
 	}
+
+	printRequest();
     return 0;
 }
 
 void PrintInstance(CComPtr<ISetupInstance2>& instance2, CComPtr<ISetupHelper>& setupHelper)
 {
 	USES_CONVERSION;
-
+	vcToolsFound = false;
 	CComBSTR	bstrId;
+	
 	if (FAILED(instance2->GetInstanceId(&bstrId)))
 	{
 		std::wcout << L"Error reading instance id" << std::endl;
 	}
+	vcInstance = bstrId.Copy();
 	InstanceState state;
 	if (FAILED(instance2->GetState(&state)))
 	{
@@ -130,22 +160,36 @@ void PrintInstance(CComPtr<ISetupInstance2>& instance2, CComPtr<ISetupHelper>& s
 			return;
 		}
 
-		CComSafeArray<IUnknown*> packages;
-		packages.Attach(lpsaPackages);
+		if (option >= 2) {
+			CComSafeArray<IUnknown*> packages;
+			packages.Attach(lpsaPackages);
 
-		PrintWorkloads(packages);
-		std::wcout << std::endl;
+			PrintWorkloads(packages);
+			std::wcout << std::endl;
+		}
+
+		if (option == 3 && !vcToolsFound) std::wcout << L"Instance " << OLE2T(vcInstance) << " does not have the VC++ 2017 compiler tools installed.\n";
+
 	}
 }
 
 void PrintPackageReference(CComPtr<ISetupPackageReference>& package)
 {
 	USES_CONVERSION;
+	
 
 	CComBSTR bstrId;
 	if (FAILED(package->GetId(&bstrId)))
 	{
 		std::wcout << L"Error getting reference id (GetId failed)" << std::endl;
+	}
+
+	//check if instance has VC tools
+	if (bstrId == L"Microsoft.VisualStudio.Component.VC.Tools.x86.x64") {
+		vcToolsFound = true;
+		if (option == 3) {
+			std::wcout << L"Instance " << OLE2T(vcInstance) << " contains the VC++ 2017 compiler tools (x86 and x64 targets).\n";
+		}
 	}
 
 	CComBSTR bstrType;
@@ -154,7 +198,7 @@ void PrintPackageReference(CComPtr<ISetupPackageReference>& package)
 		std::wcout << L"Error getting reference type (GetType failed)" << std::endl;
 	}
 
-	std::wcout << OLE2T(bstrId) << L" (" << OLE2T(bstrType) << L")" << std::endl;
+	if (option == 2) std::wcout << OLE2T(bstrId) << L" (" << OLE2T(bstrType) << L")" << std::endl;
 }
 
 void PrintWorkloads(CComSafeArray<IUnknown*>& packages)
@@ -168,8 +212,9 @@ void PrintWorkloads(CComSafeArray<IUnknown*>& packages)
 			std::wcout << L"Error querying package (QI for ISetupPackageReference failed)" << std::endl;
 			continue;
 		}
-		
-		std::wcout << L"	";
+
+		if (option == 2) std::wcout << L"	";
 		PrintPackageReference(package);
+		
 	}
 }
